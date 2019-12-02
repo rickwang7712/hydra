@@ -9,6 +9,14 @@ CREATE INDEX hydra_oauth2_authentication_request_cid_idx ON hydra_oauth2_authent
 CREATE INDEX hydra_oauth2_authentication_request_sub_idx ON hydra_oauth2_authentication_request (subject);
 CREATE UNIQUE INDEX hydra_oauth2_authentication_request_veri_idx ON hydra_oauth2_authentication_request (verifier);
 
+-- Fix performance issue of Admin API - Revoke Login Sessions
+CREATE INDEX hydra_oauth2_authentication_session_sub_idx ON hydra_oauth2_authentication_session (subject);
+CREATE INDEX hydra_oauth2_authentication_request_login_session_id_idx ON hydra_oauth2_authentication_request (login_session_id);
+CREATE INDEX hydra_oauth2_authentication_request_challenge_idx ON hydra_oauth2_authentication_request (challenge);
+CREATE INDEX hydra_oauth2_authentication_request_handled_challenge_idx ON hydra_oauth2_authentication_request_handled(challenge);
+CREATE INDEX hydra_oauth2_consent_request_login_session_id_idx ON hydra_oauth2_consent_request(login_session_id);
+CREATE INDEX hydra_oauth2_consent_request_login_challenge_idx ON hydra_oauth2_consent_request(login_challenge);
+
 -- +migrate Down
 DROP INDEX hydra_oauth2_obfuscated_authentication_session_so_idx;
 
@@ -19,3 +27,10 @@ DROP INDEX hydra_oauth2_consent_request_veri_idx;
 DROP INDEX hydra_oauth2_authentication_request_cid_idx;
 DROP INDEX hydra_oauth2_authentication_request_sub_idx;
 DROP INDEX hydra_oauth2_authentication_request_veri_idx;
+
+DROP INDEX hydra_oauth2_authentication_session_sub_idx;
+DROP INDEX hydra_oauth2_authentication_request_login_session_id_idx;
+DROP INDEX hydra_oauth2_authentication_request_challenge_idx;
+DROP INDEX hydra_oauth2_authentication_request_handled_challenge_idx;
+DROP INDEX hydra_oauth2_consent_request_login_session_id_idx;
+DROP INDEX hydra_oauth2_consent_request_login_challenge_idx;
