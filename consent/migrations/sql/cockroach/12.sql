@@ -40,15 +40,13 @@ CREATE TABLE hydra_oauth2_authentication_request (
 	INDEX (client_id),
 	INDEX (subject),
 	INDEX (login_session_id),
-	UNIQUE INDEX (verifier),
-	INDEX (challenge)
+	UNIQUE INDEX (verifier)
 );
 CREATE TABLE hydra_oauth2_authentication_session (
 	id varchar(40) NOT NULL PRIMARY KEY,
 	authenticated_at timestamp NOT NULL DEFAULT NOW(),
 	subject varchar(255) NOT NULL,
-	remember bool NOT NULL DEFAULT FALSE,
-	INDEX (subject)
+	remember bool NOT NULL DEFAULT FALSE
 );
 CREATE TABLE hydra_oauth2_consent_request_handled (
 	challenge varchar(40) NOT NULL PRIMARY KEY,
@@ -74,8 +72,7 @@ CREATE TABLE hydra_oauth2_authentication_request_handled (
 	authenticated_at timestamp NULL,
 	was_used bool NOT NULL,
 	forced_subject_identifier VARCHAR(255) NULL DEFAULT '',
-	context TEXT NOT NULL DEFAULT '{}',
-	INDEX (challenge)
+	context TEXT NOT NULL DEFAULT '{}'
 );
 CREATE TABLE hydra_oauth2_obfuscated_authentication_session (
 	subject varchar(255) NOT NULL,
