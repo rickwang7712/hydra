@@ -36,7 +36,7 @@ import (
 
 	httptransport "github.com/go-openapi/runtime/client"
 
-	hydra "github.com/ory/hydra/sdk/go/hydra/client"
+	hydra "github.com/ory/hydra/internal/httpclient/client"
 	"github.com/ory/x/cmdx"
 	"github.com/ory/x/flagx"
 )
@@ -54,6 +54,7 @@ func newTransport(cmd *cobra.Command) *transport {
 	return &transport{
 		cmd: cmd,
 		Transport: httpx.NewResilientRoundTripper(
+			/* #nosec G402 - we want to support dev environments, hence tls trickery */
 			&http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: flagx.MustGetBool(cmd, "skip-tls-verify")},
 			},

@@ -24,9 +24,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ory/hydra/x"
-
-	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 
 	"github.com/ory/fosite"
@@ -57,7 +54,7 @@ func (m *MemoryManager) GetConcreteClient(ctx context.Context, id string) (*Clie
 		}
 	}
 
-	return nil, errors.WithStack(x.ErrNotFound)
+	return nil, errors.WithStack(sqlcon.ErrNoRows)
 }
 
 func (m *MemoryManager) GetClient(ctx context.Context, id string) (fosite.Client, error) {
@@ -78,9 +75,6 @@ func (m *MemoryManager) UpdateClient(ctx context.Context, c *Client) error {
 			return errors.WithStack(err)
 		}
 		c.Secret = string(h)
-	}
-	if err := mergo.Merge(c, o); err != nil {
-		return errors.WithStack(err)
 	}
 
 	m.Lock()
@@ -147,11 +141,7 @@ func (m *MemoryManager) GetClients(ctx context.Context, limit, offset int) (clie
 	defer m.RUnlock()
 
 	start, end := pagination.Index(limit, offset, len(m.Clients))
-	for _, c := range m.Clients[start:end] {
-		clients = append(clients, c)
-	}
-
-	return clients, nil
+	return append(clients, m.Clients[start:end]...), nil
 }
 
 func (m *MemoryManager) CountClients(ctx context.Context) (n int, err error) {

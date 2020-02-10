@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -38,7 +39,7 @@ const (
 	ViperKeyOIDCDiscoverySupportedScope   = "webfinger.oidc_discovery.supported_scope"
 	ViperKeyOIDCDiscoveryUserinfoEndpoint = "webfinger.oidc_discovery.userinfo_url"
 
-	ViperKeySubjectTypesSupported          = "oidc.subject_identifiers.enabled"
+	ViperKeySubjectTypesSupported          = "oidc.subject_identifiers.supported_types"
 	ViperKeyDefaultClientScope             = "oidc.dynamic_client_registration.default_scope"
 	ViperKeyDSN                            = "dsn"
 	ViperKeyBCryptCost                     = "oauth2.hashers.bcrypt.cost"
@@ -48,10 +49,11 @@ const (
 	ViperKeyPublicListenOnHost             = "serve.public.host"
 	ViperKeyPublicListenOnPort             = "serve.public.port"
 	ViperKeyPublicDisableHealthAccessLog   = "serve.public.access_log.disable_for_health"
+	ViperKeyCookieSameSiteMode             = "serve.cookies.same_site_mode"
 	ViperKeyConsentRequestMaxAge           = "ttl.login_consent_request"
-	ViperKeyAccessTokenLifespan            = "ttl.access_token"
-	ViperKeyRefreshTokenLifespan           = "ttl.refresh_token"
-	ViperKeyIDTokenLifespan                = "ttl.id_token"
+	ViperKeyAccessTokenLifespan            = "ttl.access_token"  // #nosec G101
+	ViperKeyRefreshTokenLifespan           = "ttl.refresh_token" // #nosec G101
+	ViperKeyIDTokenLifespan                = "ttl.id_token"      // #nosec G101
 	ViperKeyAuthCodeLifespan               = "ttl.auth_code"
 	ViperKeyScopeStrategy                  = "strategies.scope"
 	ViperKeyGetCookieSecrets               = "secrets.cookie"
@@ -118,6 +120,7 @@ func (v *ViperProvider) SubjectTypesSupported() []string {
 		viperx.GetStringSlice(v.l,
 			ViperKeySubjectTypesSupported,
 			[]string{"public"},
+			"oidc.subject_identifiers.enabled",
 			"OIDC_SUBJECT_TYPES_SUPPORTED",
 		),
 		func(s string) bool {
@@ -214,6 +217,20 @@ func (v *ViperProvider) adminHost() string {
 
 func (v *ViperProvider) adminPort() int {
 	return viperx.GetInt(v.l, ViperKeyAdminListenOnPort, 4445, "ADMIN_PORT")
+}
+
+func (v *ViperProvider) CookieSameSiteMode() http.SameSite {
+	sameSiteModeStr := viperx.GetString(v.l, ViperKeyCookieSameSiteMode, "default", "COOKIE_SAME_SITE_MODE")
+	switch strings.ToLower(sameSiteModeStr) {
+	case "lax":
+		return http.SameSiteLaxMode
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	default:
+		return http.SameSiteDefaultMode
+	}
 }
 
 func (v *ViperProvider) ConsentRequestMaxAge() time.Duration {

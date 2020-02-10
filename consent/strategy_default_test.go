@@ -48,17 +48,18 @@ import (
 
 	"github.com/ory/fosite"
 	"github.com/ory/fosite/token/jwt"
+	"github.com/ory/x/pointerx"
+	"github.com/ory/x/urlx"
+
 	"github.com/ory/hydra/client"
 	. "github.com/ory/hydra/consent"
 	"github.com/ory/hydra/driver"
 	"github.com/ory/hydra/driver/configuration"
 	"github.com/ory/hydra/internal"
-	hydra "github.com/ory/hydra/sdk/go/hydra/client"
-	"github.com/ory/hydra/sdk/go/hydra/client/admin"
-	"github.com/ory/hydra/sdk/go/hydra/models"
+	hydra "github.com/ory/hydra/internal/httpclient/client"
+	"github.com/ory/hydra/internal/httpclient/client/admin"
+	"github.com/ory/hydra/internal/httpclient/models"
 	"github.com/ory/hydra/x"
-	"github.com/ory/x/pointerx"
-	"github.com/ory/x/urlx"
 )
 
 func mustRSAKey() *rsa.PrivateKey {
@@ -93,10 +94,10 @@ func newCookieJar(t *testing.T) *cookiejar.Jar {
 	return c
 }
 
-func acceptRequest(apiClient *hydra.OryHydra, consent *models.HandledConsentRequest) func(t *testing.T) func(http.ResponseWriter, *http.Request) {
+func acceptRequest(apiClient *hydra.OryHydra, consent *models.AcceptConsentRequest) func(t *testing.T) func(http.ResponseWriter, *http.Request) {
 	if consent == nil {
-		consent = &models.HandledConsentRequest{
-			GrantedScope: []string{"scope-a"},
+		consent = &models.AcceptConsentRequest{
+			GrantScope: []string{"scope-a"},
 		}
 	}
 	return func(t *testing.T) func(w http.ResponseWriter, r *http.Request) {
@@ -152,7 +153,7 @@ func acceptLogoutChallenge(api *hydra.OryHydra, key string) func(t *testing.T) f
 			logout, err := api.Admin.GetLogoutRequest(admin.NewGetLogoutRequestParams().WithLogoutChallenge(c))
 			require.NoError(t, err)
 			assert.EqualValues(t, "logout-subject-"+key, logout.Payload.Subject)
-			assert.EqualValues(t, "logout-session-"+key, logout.Payload.SessionID)
+			assert.EqualValues(t, "logout-session-"+key, logout.Payload.Sid)
 
 			redir, err := api.Admin.AcceptLogoutRequest(admin.NewAcceptLogoutRequestParams().WithLogoutChallenge(c))
 			require.NoError(t, err)
@@ -232,6 +233,7 @@ func TestStrategyLogout(t *testing.T) {
 		d                string
 		params           url.Values
 		subject          string
+		sessionID        string
 		lph              func(t *testing.T) func(w http.ResponseWriter, r *http.Request)
 		expectSession    *HandledConsentRequest
 		expectBody       string
@@ -304,8 +306,9 @@ func TestStrategyLogout(t *testing.T) {
 					}
 				},
 			},
-			jar:     newValidAuthCookieJar(t, reg, logoutServer.URL, "logout-session-2", "logout-subject-2"),
-			subject: "logout-subject-2",
+			jar:       newValidAuthCookieJar(t, reg, logoutServer.URL, "logout-session-2", "logout-subject-2"),
+			subject:   "logout-subject-2",
+			sessionID: "logout-session-2",
 		},
 		{
 			d:                "should error when rp-flow without valid id token",
@@ -473,6 +476,7 @@ func TestStrategyLogout(t *testing.T) {
 				}))
 				servers[k] = httptest.NewServer(n)
 				c, hc := MockConsentRequest(uuid.New(), true, 100, false, false, true)
+				c.LoginSessionID = tc.sessionID
 				c.Client.BackChannelLogoutURI = servers[k].URL
 				c.Subject = tc.subject
 				require.NoError(t, reg.ConsentManager().CreateConsentRequest(context.Background(), c))
@@ -598,7 +602,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 					assert.Contains(t, lr.RequestURL, "/oauth2/auth?login_verifier=&consent_verifier=&")
 					assert.EqualValues(t, false, lr.Skip)
 					assert.EqualValues(t, "", lr.Subject)
-					assert.EqualValues(t, &models.OpenIDConnectContext{ACRValues: nil, Display: "page", UILocales: []string{"de", "en"}}, lr.OidcContext, "%s", res.Payload)
+					assert.EqualValues(t, &models.OpenIDConnectContext{AcrValues: nil, Display: "page", UILocales: []string{"de", "en"}}, lr.OidcContext, "%s", res.Payload)
 					w.WriteHeader(http.StatusNoContent)
 				}
 			},
@@ -613,12 +617,12 @@ func TestStrategyLoginConsent(t *testing.T) {
 				return func(w http.ResponseWriter, r *http.Request) {
 					vr, err := apiClient.Admin.RejectLoginRequest(admin.NewRejectLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.RequestDeniedError{
-							Name:        fosite.ErrInteractionRequired.Name,
-							Debug:       fosite.ErrInteractionRequired.Debug,
-							Description: fosite.ErrInteractionRequired.Description,
-							Hint:        fosite.ErrInteractionRequired.Hint,
-							Code:        int64(fosite.ErrInteractionRequired.Code),
+						WithBody(&models.RejectRequest{
+							Error:            fosite.ErrInteractionRequired.Name,
+							ErrorDebug:       fosite.ErrInteractionRequired.Debug,
+							ErrorDescription: fosite.ErrInteractionRequired.Description,
+							ErrorHint:        fosite.ErrInteractionRequired.Hint,
+							StatusCode:       int64(fosite.ErrInteractionRequired.Code),
 						}))
 					require.NoError(t, err)
 					lr := vr.Payload
@@ -666,7 +670,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 					assert.EqualValues(t, "user", lr.Subject)
 					assert.NotEmpty(t, lr.LoginChallenge)
 					assert.NotEmpty(t, lr.LoginSessionID)
-					assert.EqualValues(t, &models.OpenIDConnectContext{ACRValues: []string{"1", "2"}, Display: "page", UILocales: []string{"de", "en"}}, lr.OidcContext)
+					assert.EqualValues(t, &models.OpenIDConnectContext{AcrValues: []string{"1", "2"}, Display: "page", UILocales: []string{"de", "en"}}, lr.OidcContext)
 					w.WriteHeader(http.StatusNoContent)
 				}
 			},
@@ -693,12 +697,12 @@ func TestStrategyLoginConsent(t *testing.T) {
 					vr, err := apiClient.Admin.RejectConsentRequest(
 						admin.NewRejectConsentRequestParams().WithConsentChallenge(r.URL.Query().Get("consent_challenge")).
 							WithBody(
-								&models.RequestDeniedError{
-									Name:        fosite.ErrInteractionRequired.Name,
-									Debug:       fosite.ErrInteractionRequired.Debug,
-									Description: fosite.ErrInteractionRequired.Description,
-									Hint:        fosite.ErrInteractionRequired.Hint,
-									Code:        int64(fosite.ErrInteractionRequired.Code),
+								&models.RejectRequest{
+									Error:            fosite.ErrInteractionRequired.Name,
+									ErrorDebug:       fosite.ErrInteractionRequired.Debug,
+									ErrorDescription: fosite.ErrInteractionRequired.Description,
+									ErrorHint:        fosite.ErrInteractionRequired.Hint,
+									StatusCode:       int64(fosite.ErrInteractionRequired.Code),
 								}),
 					)
 					require.NoError(t, err)
@@ -854,13 +858,12 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:     pointerx.String("user"),
 							Remember:    false,
 							RememberFor: 0,
-							ACR:         "1",
-
-							Context: map[string]interface{}{"foo": "bar"},
+							Acr:         "1",
+							Context:     map[string]interface{}{"foo": "bar"},
 						}))
 					require.NoError(t, err)
 					v := vr.Payload
@@ -1016,11 +1019,11 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:     pointerx.String("fooser"),
 							Remember:    false,
 							RememberFor: 0,
-							ACR:         "1",
+							Acr:         "1",
 						}))
 					require.Error(t, err)
 					require.Empty(t, vr)
@@ -1043,15 +1046,15 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					assert.True(t, rr.Skip)
 					assert.Equal(t, "user", rr.Subject)
-					assert.Empty(t, rr.Client.Secret)
+					assert.Empty(t, rr.Client.ClientSecret)
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:     pointerx.String("user"),
 							Remember:    false,
 							RememberFor: 0,
-							ACR:         "1",
+							Acr:         "1",
 						}))
 					require.NoError(t, err)
 					v := vr.Payload
@@ -1068,7 +1071,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 					assert.True(t, rr.Skip)
 					assert.Equal(t, "client-id", rr.Client.ClientID)
 					assert.Equal(t, "user", rr.Subject)
-					assert.Empty(t, rr.Client.Secret)
+					assert.Empty(t, rr.Client.ClientSecret)
 
 					passAuthorization(apiClient, false)(t)(w, r)
 				}
@@ -1102,11 +1105,11 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:     pointerx.String("user"),
 							Remember:    true,
 							RememberFor: 0,
-							ACR:         "1",
+							Acr:         "1",
 						}))
 					require.NoError(t, err)
 					v := vr.Payload
@@ -1132,7 +1135,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 					require.NoError(t, err)
 					defer hres.Body.Close()
 
-					var v models.RequestHandlerResponse
+					var v models.CompletedRequest
 					require.NoError(t, json.NewDecoder(hres.Body).Decode(&v))
 					require.EqualValues(t, http.StatusOK, hres.StatusCode)
 					require.NotEmpty(t, v.RedirectTo)
@@ -1167,11 +1170,11 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:     pointerx.String("user"),
 							Remember:    true,
 							RememberFor: 0,
-							ACR:         "1",
+							Acr:         "1",
 						}))
 					require.NoError(t, err)
 					v := vr.Payload
@@ -1241,11 +1244,11 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:     pointerx.String("user"),
 							Remember:    false,
 							RememberFor: 0,
-							ACR:         "1",
+							Acr:         "1",
 						}))
 					require.NoError(t, err)
 					v := vr.Payload
@@ -1272,11 +1275,11 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:     pointerx.String("user"),
 							Remember:    false,
 							RememberFor: 0,
-							ACR:         "1",
+							Acr:         "1",
 						}))
 					require.NoError(t, err)
 					v := vr.Payload
@@ -1323,11 +1326,11 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:     pointerx.String("not-foouser"),
 							Remember:    false,
 							RememberFor: 0,
-							ACR:         "1",
+							Acr:         "1",
 						}))
 					require.NoError(t, err)
 					v := vr.Payload
@@ -1354,11 +1357,11 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:     pointerx.String("foouser"),
 							Remember:    false,
 							RememberFor: 0,
-							ACR:         "1",
+							Acr:         "1",
 						}))
 					require.NoError(t, err)
 					v := vr.Payload
@@ -1376,11 +1379,11 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptConsentRequest(admin.NewAcceptConsentRequestParams().
 						WithConsentChallenge(r.URL.Query().Get("consent_challenge")).
-						WithBody(&models.HandledConsentRequest{
-							GrantedScope: []string{"scope-a"},
-							Remember:     false,
-							RememberFor:  0,
-							Session: &models.ConsentRequestSessionData{
+						WithBody(&models.AcceptConsentRequest{
+							GrantScope:  []string{"scope-a"},
+							Remember:    false,
+							RememberFor: 0,
+							Session: &models.ConsentRequestSession{
 								AccessToken: map[string]interface{}{"foo": "bar"},
 								IDToken:     map[string]interface{}{"bar": "baz"},
 							},
@@ -1431,7 +1434,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 				return func(w http.ResponseWriter, r *http.Request) {
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:  pointerx.String("auth-user"),
 							Remember: true,
 						}))
@@ -1469,7 +1472,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 				return func(w http.ResponseWriter, r *http.Request) {
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:  pointerx.String("auth-user"),
 							Remember: false,
 						}))
@@ -1503,7 +1506,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 				return func(w http.ResponseWriter, r *http.Request) {
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:                pointerx.String("auth-user"),
 							ForceSubjectIdentifier: "forced-auth-user",
 							Remember:               true,
@@ -1542,7 +1545,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 				return func(w http.ResponseWriter, r *http.Request) {
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:                pointerx.String("auth-user"),
 							ForceSubjectIdentifier: "forced-auth-user",
 							Remember:               false,
@@ -1578,7 +1581,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 				return func(w http.ResponseWriter, r *http.Request) {
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:  pointerx.String("auth-user"),
 							Remember: true,
 						}))
@@ -1602,7 +1605,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 				return func(w http.ResponseWriter, r *http.Request) {
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:  pointerx.String("not-auth-user"),
 							Remember: false,
 						}))
@@ -1631,7 +1634,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:  pointerx.String("foouser"),
 							Remember: true,
 						}))
@@ -1660,7 +1663,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:  pointerx.String("foouser"),
 							Remember: true,
 						}))
@@ -1691,7 +1694,7 @@ func TestStrategyLoginConsent(t *testing.T) {
 
 					vr, err := apiClient.Admin.AcceptLoginRequest(admin.NewAcceptLoginRequestParams().
 						WithLoginChallenge(r.URL.Query().Get("login_challenge")).
-						WithBody(&models.HandledLoginRequest{
+						WithBody(&models.AcceptLoginRequest{
 							Subject:  pointerx.String("not-foouser"),
 							Remember: false,
 						}))

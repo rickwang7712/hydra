@@ -25,13 +25,15 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ory/herodot"
+	"github.com/ory/x/sqlcon"
+
 	"github.com/ory/hydra/x"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
 
 	"github.com/ory/x/pagination"
-	"github.com/ory/x/randx"
 )
 
 type Handler struct {
@@ -87,12 +89,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 	}
 
 	if len(c.Secret) == 0 {
-		secret, err := randx.RuneSequence(12, []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-.~"))
+		secretb, err := x.GenerateSecret(26)
 		if err != nil {
 			h.r.Writer().WriteError(w, r, errors.WithStack(err))
 			return
 		}
-		c.Secret = string(secret)
+		c.Secret = string(secretb)
 	}
 
 	if err := h.r.ClientValidator().Validate(&c); err != nil {
@@ -205,6 +207,10 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 
 	pagination.Header(w, r.URL, n, limit, offset)
 
+	if c == nil {
+		c = []Client{}
+	}
+
 	h.r.Writer().Write(w, r, c)
 }
 
@@ -227,6 +233,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 //
 //     Responses:
 //       200: oAuth2Client
+//		 401: genericError
 //       404: genericError
 //       500: genericError
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -234,6 +241,9 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 	c, err := h.r.ClientManager().GetConcreteClient(r.Context(), id)
 	if err != nil {
+		if errors.Cause(err) == sqlcon.ErrNoRows {
+			err = herodot.ErrUnauthorized.WithReason("The requested OAuth 2.0 client does not exist or you did not provide the necessary credentials")
+		}
 		h.r.Writer().WriteError(w, r, err)
 		return
 	}

@@ -28,8 +28,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/ory/hydra/sdk/go/hydra/client/admin"
-	"github.com/ory/hydra/sdk/go/hydra/models"
+	"github.com/ory/hydra/internal/httpclient/client/admin"
+	"github.com/ory/hydra/internal/httpclient/models"
 	"github.com/ory/x/pointerx"
 
 	"github.com/mendsley/gojwk"
@@ -57,10 +57,10 @@ func (h *JWKHandler) CreateKeys(cmd *cobra.Command, args []string) {
 		kid = args[1]
 	}
 
-	res, err := m.Admin.CreateJSONWebKeySet(admin.NewCreateJSONWebKeySetParams().WithSet(args[0]).WithBody(&models.CreateRequest{
-		Algorithm: pointerx.String(flagx.MustGetString(cmd, "alg")),
-		KeyID:     pointerx.String(kid),
-		Use:       pointerx.String(flagx.MustGetString(cmd, "use")),
+	res, err := m.Admin.CreateJSONWebKeySet(admin.NewCreateJSONWebKeySetParams().WithSet(args[0]).WithBody(&models.JSONWebKeySetGeneratorRequest{
+		Alg: pointerx.String(flagx.MustGetString(cmd, "alg")),
+		Kid: pointerx.String(kid),
+		Use: pointerx.String(flagx.MustGetString(cmd, "use")),
 	}))
 	cmdx.Must(err, "The request failed with the following error message:\n%s", formatSwaggerError(err))
 	fmt.Println(formatResponse(res.Payload))
@@ -102,6 +102,7 @@ func (h *JWKHandler) ImportKeys(cmd *cobra.Command, args []string) {
 	use := flagx.MustGetString(cmd, "use")
 	client := &http.Client{}
 
+	/* #nosec G402 - we want to support dev environments, hence tls trickery */
 	client.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: flagx.MustGetBool(cmd, "skip-tls-verify"),

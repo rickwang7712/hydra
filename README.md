@@ -66,6 +66,17 @@ able to securely manage JSON Web Keys.
   - [Upgrading and Changelog](#upgrading-and-changelog)
   - [Command line documentation](#command-line-documentation)
   - [Develop](#develop)
+    - [Dependencies](#dependencies)
+    - [Workflows](#workflows)
+      - [Install Tools](#install-tools)
+    - [Formatting Code](#formatting-code)
+    - [Running Tests](#running-tests)
+      - [Short Tests](#short-tests)
+      - [Regular Tests](#regular-tests)
+    - [E2E Tests](#e2e-tests)
+    - [Making SQL Changes](#making-sql-changes)
+    - [Build Docker](#build-docker)
+    - [Run the Docker Compose quickstarts](#run-the-docker-compose-quickstarts)
 - [Libraries and third-party projects](#libraries-and-third-party-projects)
 - [Blog posts & articles](#blog-posts--articles)
 
@@ -88,16 +99,21 @@ to verify user consent allowing you to use ORY Hydra with any authentication end
 ### Who's using it?
 
 <!--BEGIN ADOPTERS-->
-The ORY community stands on the shoulders of individuals, companies, and maintainers. We thank everyone involved - from
-submitting bug reports and feature requests to contributing patches to sponsoring our work. Our community is
-1000+ strong and growing rapidly. The ORY stack protects 1.200.000.000+ API requests every month with over
-15.000+ active service nodes. Our small but expert team would have never been able to achieve this without each and
-every one of you.
 
-The following list represents companies that have accompanied us along the way and that have made outstanding contributions
-to our ecosystem. *If you think that your company deserves a spot here, reach out to <a href="mailto:hi@ory.sh">hi@ory.sh</a> now*!
+The ORY community stands on the shoulders of individuals, companies, and
+maintainers. We thank everyone involved - from submitting bug reports and
+feature requests, to contributing patches, to sponsoring our work. Our community
+is 1000+ strong and growing rapidly. The ORY stack protects 1.200.000.000+ API
+requests every month with over 15.000+ active service nodes. We would have never
+been able to achieve this without each and everyone of you!
 
-**Please consider giving back by becoming a sponsor of our open source work on <a href="https://www.patreon.com/_ory">Patreon</a> or 
+The following list represents companies that have accompanied us along the way
+and that have made outstanding contributions to our ecosystem. _If you think
+that your company deserves a spot here, reach out to
+<a href="mailto:hi@ory.sh">hi@ory.sh</a> now_!
+
+**Please consider giving back by becoming a sponsor of our open source work on
+<a href="https://www.patreon.com/_ory">Patreon</a> or
 <a href="https://opencollective.com/ory">Open Collective</a>.**
 
 <table>
@@ -164,6 +180,12 @@ to our ecosystem. *If you think that your company deserves a spot here, reach ou
             <td align="center"><img height="32px" src="./docs/adopters/arduino.svg" alt="Arduino"></td>
             <td><a href="https://www.arduino.cc/">arduino.cc</a></td>
         </tr>
+        <tr>
+            <td>Sponsor</td>
+            <td>OrderMyGear</td>
+            <td align="center"><img height="32px" src="./docs/adopters/ordermygear.svg" alt="OrderMyGear"></td>
+            <td><a href="https://www.ordermygear.com/">ordermygear.com</a></td>
+        </tr>
     </tdbody>
 </table>
 
@@ -175,13 +197,14 @@ as well as all of our backers
 
 <a href="https://opencollective.com/ory#backers" target="_blank"><img src="https://opencollective.com/ory/backers.svg?width=890"></a>
 
-and past & current supporters (in alphabetical order) on [Patreon](https://www.patreon.com/_ory): Alexander Alimovs,
-Billy, Chancy Kennedy, Drozzy, Edwin Trejos, Howard Edidin, Ken Adler Oz Haven, Stefan Hans, TheCrealm.
+and past & current supporters (in alphabetical order) on
+[Patreon](https://www.patreon.com/_ory): Alexander Alimovs, Billy, Chancy
+Kennedy, Drozzy, Edwin Trejos, Howard Edidin, Ken Adler Oz Haven, Stefan Hans,
+TheCrealm.
 
-<em>* Uses one of ORY's major projects in production.</em>
+<em>\* Uses one of ORY's major projects in production.</em>
 
 <!--END ADOPTERS-->
-
 
 
 ### OAuth2 and OpenID Connect: Open Standards!
@@ -245,30 +268,50 @@ Head over to the [ORY Developer Documentation](https://www.ory.sh/docs/next/hydr
 
 ## Ecosystem
 
-<a href="https://console.ory.sh/">
-    <img align="right" width="30%" src="docs/images/sec-console.png" alt="ORY Security Console">
-</a>
+<!--BEGIN ECOSYSTEM-->
+We build Ory on several guiding principles when it comes to our architecture design:
 
-### ORY Security Console: Administrative User Interface
+- Minimal dependencies
+- Runs everywhere
+- Scales without effort
+- Minimize room for human and network errors
 
-The [ORY Security Console](https://console.ory.sh/) is a visual admin interface for managing ORY Hydra,
-ORY Oathkeeper, and ORY Keto.
+ORY's architecture designed to run best on a Container Orchestration Systems such as Kubernetes, CloudFoundry, OpenShift, and similar projects.
+Binaries are small (5-15MB) and available for all popular processor types (ARM, AMD64, i386) and operating
+systems (FreeBSD, Linux, macOS, Windows) without system dependencies (Java, Node, Ruby, libxml, ...).
+
+### ORY Kratos: Identity and User Infrastructure and Management
+
+[ORY Kratos](https://github.com/ory/kratos) is an API-first Identity and User
+Management system that is built according to
+[cloud architecture best practices](https://www.ory.sh/docs/next/ecosystem/software-architecture-philosophy).
+It implements core use cases that almost every software application needs to
+deal with: Self-service Login and Registration, Multi-Factor Authentication
+(MFA/2FA), Account Recovery and Verification, Profile and Account Management.
+
+### ORY Hydra: OAuth2 & OpenID Connect Server
+
+[ORY Hydra](https://github.com/ory/hydra) is an OpenID Certified™ OAuth2 and OpenID Connect
+Provider can connect to any existing identity database (LDAP, AD, KeyCloak, PHP+MySQL, ...)
+and user interface.
 
 ### ORY Oathkeeper: Identity & Access Proxy
 
-[ORY Oathkeeper](https://github.com/ory/oathkeeper) is a BeyondCorp/Zero Trust Identity & Access Proxy (IAP) built
-on top of OAuth2 and ORY Hydra.
+[ORY Oathkeeper](https://github.com/ory/oathkeeper) is a BeyondCorp/Zero Trust
+Identity & Access Proxy (IAP) with configurable authentication, authorization,
+and request mutation rules for your web services: Authenticate JWT, Access Tokens,
+API Keys, mTLS; Check if the contained subject is allowed to perform the request;
+Encode resulting content into custom headers (`X-User-ID`), JSON Web Tokens
+and more!
 
 ### ORY Keto: Access Control Policies as a Server
 
-[ORY Keto](https://github.com/ory/keto) is a policy decision point. It uses a set of access control policies, similar
-to AWS IAM Policies, in order to determine whether a subject (user, application, service, car, ...) is authorized to
-perform a certain action on a resource.
+[ORY Keto](https://github.com/ory/keto) is a policy decision point. It uses a
+set of access control policies, similar to AWS IAM Policies, in order to
+determine whether a subject (user, application, service, car, ...) is authorized
+to perform a certain action on a resource.
+<!--END ECOSYSTEM-->
 
-### Examples
-
-The [ory/examples](https://github.com/ory/examples) repository contains numerous examples of setting up this project
-individually and together with other services from the ORY Ecosystem.
 
 ## Security
 
@@ -314,29 +357,145 @@ Run `hydra -h` or `hydra help`.
 
 ### Develop
 
-Developing with ORY Hydra is as easy as:
+We encourage all contributions and encourage you to read our [contribution guidelines](./CONTRIBUTING.md).
 
+#### Dependencies
+
+You need Go 1.13+ with `GO111MODULE=on` and (for the test suites):
+
+- Docker and Docker Compose
+- Makefile
+- NodeJS / npm
+
+It is possible to develop ORY Hydra on Windows, but please be aware that all guides assume a Unix shell like bash or zsh.
+
+#### Workflows
+
+##### Install Tools
+
+When cloning ORY Hydra, run `make tools`. It will download several required dependencies. If you haven't run the command
+in a while it's probably a good idea to run it again.
+
+#### Formatting Code
+
+You can format all code using `make format`. Our CI checks if your code is properly formatted.
+
+#### Running Tests
+
+There are three types of tests you can run:
+
+- Short tests (do not require a SQL database like PostgreSQL)
+- Regular tests (do require PostgreSQL, MySQL, CockroachDB)
+- End to end tests (do require databases and will use a test browser)
+
+##### Short Tests
+
+Short tests run fairly quickly. You can either test all of the code at once:
+
+```shell script
+go test -short ./...
 ```
-go get -d -u github.com/ory/hydra
-cd $GOPATH/src/github.com/ory/hydra
-make init
-export GO111MODULE=on
-## With database
+
+or test just a specific module:
+
+```shell script
+cd client; go test -short .
+```
+
+##### Regular Tests
+
+Regular tests require a database set up. Our test suite is able to work with docker directly (using [ory/dockertest](https://github.com/ory/dockertest))
+but we encourage to use the Makefile instead. Using dockertest can bloat the number of Docker Images on your system
+and are quite slow. Instead we recommend doing:
+
+```shell script
 make test
-## Without database
-make quicktest
 ```
 
-Then run it with in-memory database:
+Please be aware that `make test` recreates the databases every time you run `make test`. This can be annoying if
+you are trying to fix something very specific and need the database tests all the time. In that case we
+suggest that you initialize the databases with:
+
+```shell script
+make resetdb
+export TEST_DATABASE_MYSQL='mysql://root:secret@(127.0.0.1:3444)/mysql?parseTime=true'
+export TEST_DATABASE_POSTGRESQL='postgres://postgres:secret@127.0.0.1:3445/hydra?sslmode=disable'
+export TEST_DATABASE_COCKROACHDB='cockroach://root@127.0.0.1:3446/defaultdb?sslmode=disable'
+```
+
+Then you can run `go test` as often as you'd like:
+
+```shell script
+go test ./...
+
+# or in a module:
+cd client; go test .
+```
+
+#### E2E Tests
+
+The E2E tests use [Cypress](https://www.cypress.io) to run full browser tests. You can execute these tests with:
 
 ```
-DSN=memory go run main.go serve all
+make e2e
 ```
 
-**Notes**
+The runner will not show the Browser window, as it runs in the CI Mode (background). That makes debugging these
+type of tests very difficult, but thankfully you can run the e2e test in the browser which helps with debugging! Just run:
 
-* We changed organization name from `ory-am` to `ory`. In order to keep backward compatibility, we did not rename Go packages.
-* You can ignore warnings similar to `package github.com/ory/hydra/cmd/server: case-insensitive import collision: "github.com/sirupsen/logrus" and "github.com/sirupsen/logrus"`.
+```shell script
+./test/e2e/circle-ci.bash memory --watch
+
+# Or for the JSON Web Token Access Token strategy:
+# ./test/e2e/circle-ci.bash memory-jwt --watch
+```
+
+or if you would like to test one of the databases:
+
+```shell script
+make resetdb
+export TEST_DATABASE_MYSQL='mysql://root:secret@(127.0.0.1:3444)/mysql?parseTime=true'
+export TEST_DATABASE_POSTGRESQL='postgres://postgres:secret@127.0.0.1:3445/hydra?sslmode=disable'
+export TEST_DATABASE_COCKROACHDB='cockroach://root@127.0.0.1:3446/defaultdb?sslmode=disable'
+
+# You can test against each individual database:
+./test/e2e/circle-ci.bash postgres --watch
+./test/e2e/circle-ci.bash memory --watch
+./test/e2e/circle-ci.bash mysql --watch
+# ...
+```
+
+Once you run the script, a Cypress window will appear. Hit the button "Run all Specs"!
+
+The code for these tests is located in [./cypress/integration](./cypress/integration) and
+[./cypress/support](./cypress/support) and
+[./cypress/helpers](./cypress/helpers). The website you're seeing is located in
+[./test/e2e/oauth2-client](./test/e2e/oauth2-client).
+
+#### Making SQL Changes
+
+We embed the SQL files into the binary. If you make changes to any `.sql` file, you need to run:
+
+```shell script
+make sqlbin
+```
+
+#### Build Docker
+
+You can build a development Docker Image using:
+
+```shell script
+make docker
+```
+
+#### Run the Docker Compose quickstarts
+
+If you wish to check your code changes against any of the docker-compose quickstart files, run:
+
+```shell script
+make docker
+docker compose -f quickstart.yml up # ....
+```
 
 ## Libraries and third-party projects
 

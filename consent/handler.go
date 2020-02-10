@@ -221,7 +221,7 @@ func (h *Handler) DeleteLoginSession(w http.ResponseWriter, r *http.Request, ps 
 
 // swagger:route GET /oauth2/auth/requests/login admin getLoginRequest
 //
-// Get an login request
+// Get a login request
 //
 // When an authorization code, hybrid, or implicit OAuth 2.0 Flow is initiated, ORY Hydra asks the login provider
 // (sometimes called "identity provider") to authenticate the subject and then tell ORY Hydra now about it. The login
@@ -274,7 +274,7 @@ func (h *Handler) GetLoginRequest(w http.ResponseWriter, r *http.Request, ps htt
 
 // swagger:route PUT /oauth2/auth/requests/login/accept admin acceptLoginRequest
 //
-// Accept an login request
+// Accept a login request
 //
 // When an authorization code, hybrid, or implicit OAuth 2.0 Flow is initiated, ORY Hydra asks the login provider
 // (sometimes called "identity provider") to authenticate the subject and then tell ORY Hydra now about it. The login
@@ -496,7 +496,7 @@ func (h *Handler) GetConsentRequest(w http.ResponseWriter, r *http.Request, ps h
 
 // swagger:route PUT /oauth2/auth/requests/consent/accept admin acceptConsentRequest
 //
-// Accept an consent request
+// Accept a consent request
 //
 // When an authorization code, hybrid, or implicit OAuth 2.0 Flow is initiated, ORY Hydra asks the login provider
 // to authenticate the subject and then tell ORY Hydra now about it. If the subject authenticated, he/she must now be asked if
@@ -553,6 +553,7 @@ func (h *Handler) AcceptConsentRequest(w http.ResponseWriter, r *http.Request, p
 
 	p.Challenge = challenge
 	p.RequestedAt = cr.RequestedAt
+	p.HandledAt = time.Now().UTC()
 
 	hr, err := h.r.ConsentManager().HandleConsentRequest(r.Context(), challenge, &p)
 	if err != nil {
@@ -575,7 +576,7 @@ func (h *Handler) AcceptConsentRequest(w http.ResponseWriter, r *http.Request, p
 
 // swagger:route PUT /oauth2/auth/requests/consent/reject admin rejectConsentRequest
 //
-// Reject an consent request
+// Reject a consent request
 //
 // When an authorization code, hybrid, or implicit OAuth 2.0 Flow is initiated, ORY Hydra asks the login provider
 // to authenticate the subject and then tell ORY Hydra now about it. If the subject authenticated, he/she must now be asked if
@@ -633,6 +634,7 @@ func (h *Handler) RejectConsentRequest(w http.ResponseWriter, r *http.Request, p
 		Error:       &p,
 		Challenge:   challenge,
 		RequestedAt: hr.RequestedAt,
+		HandledAt:   time.Now().UTC(),
 	})
 	if err != nil {
 		h.r.Writer().WriteError(w, r, errors.WithStack(err))
